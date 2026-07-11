@@ -14,8 +14,20 @@ export const supabase = createClient(
 );
 
 // Call an edge function with the current user session attached.
+// On failure, dig the real { error } message out of the function's response body
+// (supabase-js hides it behind a generic "non-2xx" FunctionsHttpError otherwise).
 export async function invoke<T = unknown>(name: string, body: Record<string, unknown>): Promise<T> {
   const { data, error } = await supabase.functions.invoke(name, { body });
-  if (error) throw error;
+  if (error) {
+    let detail = error.message;
+    const ctx = (error as { context?: unknown }).context;
+    if (ctx instanceof Response) {
+      try {
+        const b = await ctx.clone().json();
+        if (b?.error) detail = typeof b.error === "string" ? b.error : JSON.stringify(b.error);
+      } catch { /* body wasn't JSON; keep generic message */ }
+    }
+    throw new Error(detail);
+  }
   return data as T;
 }
