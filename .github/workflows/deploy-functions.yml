@@ -1,0 +1,30 @@
+name: Deploy Edge Functions
+
+# Auto-deploys Supabase edge functions to the Showrunner project on every push
+# to main that touches supabase/functions. No local CLI needed — runs in the cloud.
+#
+# Requires two GitHub repo secrets (Settings → Secrets and variables → Actions):
+#   SUPABASE_ACCESS_TOKEN  — from supabase.com → Account → Access Tokens
+#   SUPABASE_PROJECT_ID    — the project ref (geghlxgattcocbzbyvms)
+
+on:
+  push:
+    branches: [main]
+    paths: ["supabase/functions/**"]
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Deploy all functions
+        run: |
+          supabase functions deploy sr-breakdown      --project-ref "${{ secrets.SUPABASE_PROJECT_ID }}"
+          supabase functions deploy sr-generate-asset --project-ref "${{ secrets.SUPABASE_PROJECT_ID }}"
+          supabase functions deploy sr-render         --project-ref "${{ secrets.SUPABASE_PROJECT_ID }}"
