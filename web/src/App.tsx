@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "./lib/supabase";
+import { supabase, supabaseConfigured } from "./lib/supabase";
 import { BiblePage } from "./pages/BiblePage";
 import { ScriptPage } from "./pages/ScriptPage";
 import { BoardPage } from "./pages/BoardPage";
@@ -12,6 +12,22 @@ export function App() {
   const [tab, setTab] = useState<Tab>("bible");
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
+
+  if (!supabaseConfigured) {
+    return (
+      <Shell>
+        <div className="max-w-md mx-auto mt-24 space-y-3">
+          <h1 className="text-2xl font-semibold">Showrunner — not configured</h1>
+          <p className="text-sm opacity-70">
+            The Supabase env vars weren't in this build. In Vercel set
+            <code className="mx-1 px-1 bg-white/10 rounded">VITE_SUPABASE_URL</code> and
+            <code className="mx-1 px-1 bg-white/10 rounded">VITE_SUPABASE_ANON_KEY</code>
+            (Production), then <b>Redeploy</b> — Vite bakes them in at build time.
+          </p>
+        </div>
+      </Shell>
+    );
+  }
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => { setSession(data.session); setReady(true); });
