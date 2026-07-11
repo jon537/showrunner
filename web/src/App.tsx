@@ -11,7 +11,17 @@ export function App() {
   const [ready, setReady] = useState(false);
   const [tab, setTab] = useState<Tab>("bible");
   const [email, setEmail] = useState("");
-  const [sent, setSent] = useState(false);
+  const [password, setPassword] = useState("");
+  const [msg, setMsg] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  // All hooks run unconditionally (Rules of Hooks); branch on config inside.
+  useEffect(() => {
+    if (!supabaseConfigured) { setReady(true); return; }
+    supabase.auth.getSession().then(({ data }) => { setSession(data.session); setReady(true); });
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
+    return () => sub.subscription.unsubscribe();
+  }, []);
 
   if (!supabaseConfigured) {
     return (
@@ -19,46 +29,53 @@ export function App() {
         <div className="max-w-md mx-auto mt-24 space-y-3">
           <h1 className="text-2xl font-semibold">Showrunner — not configured</h1>
           <p className="text-sm opacity-70">
-            The Supabase env vars weren't in this build. In Vercel set
-            <code className="mx-1 px-1 bg-white/10 rounded">VITE_SUPABASE_URL</code> and
-            <code className="mx-1 px-1 bg-white/10 rounded">VITE_SUPABASE_ANON_KEY</code>
-            (Production), then <b>Redeploy</b> — Vite bakes them in at build time.
+            Set <code className="mx-1 px-1 bg-white/10 rounded">VITE_SUPABASE_URL</code> and
+            <code className="mx-1 px-1 bg-white/10 rounded">VITE_SUPABASE_ANON_KEY</code> in
+            Vercel (Production), then Redeploy.
           </p>
         </div>
       </Shell>
     );
   }
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => { setSession(data.session); setReady(true); });
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
-    return () => sub.subscription.unsubscribe();
-  }, []);
-
   if (!ready) return <Shell><p className="opacity-60">Loading…</p></Shell>;
 
   if (!session) {
+    async function signIn() {
+      setBusy(true); setMsg(null);
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) setMsg(error.message);
+      setBusy(false);
+    }
+    async function signUp() {
+      setBusy(true); setMsg(null);
+      const { data, error } = await supabase.auth.signUp({ email, password });
+      if (error) setMsg(error.message);
+      else if (!data.session) setMsg("Account created. Check your email to confirm, then Sign in.");
+      setBusy(false);
+    }
     return (
       <Shell>
         <div className="max-w-sm mx-auto mt-24 space-y-3">
           <h1 className="text-2xl font-semibold">Showrunner</h1>
-          <p className="text-sm opacity-60">Sign in with a magic link.</p>
-          {sent ? (
-            <p className="text-emerald-400 text-sm">Check your email for the link.</p>
-          ) : (
-            <>
-              <input
-                className="w-full bg-white/5 rounded px-3 py-2 outline-none"
-                placeholder="you@email.com" value={email}
-                onChange={e => setEmail(e.target.value)} />
-              <button
-                className="w-full bg-emerald-600 hover:bg-emerald-500 rounded px-3 py-2"
-                onClick={async () => {
-                  await supabase.auth.signInWithOtp({ email });
-                  setSent(true);
-                }}>Send magic link</button>
-            </>
-          )}
+          <p className="text-sm opacity-60">Sign in, or create an account.</p>
+          <input className="w-full bg-white/5 rounded px-3 py-2 outline-none"
+            placeholder="you@email.com" autoComplete="email" value={email}
+            onChange={e => setEmail(e.target.value)} />
+          <input className="w-full bg-white/5 rounded px-3 py-2 outline-none" type="password"
+            placeholder="password" autoComplete="current-password" value={password}
+            onChange={e => setPassword(e.target.value)} />
+          {msg && <p className="text-amber-400 text-sm">{msg}</p>}
+          <div className="flex gap-2">
+            <button disabled={busy} onClick={signIn}
+              className="flex-1 bg-emerald-600 hover:bg-emerald-500 rounded px-3 py-2 disabled:opacity-40">
+              Sign in
+            </button>
+            <button disabled={busy} onClick={signUp}
+              className="flex-1 bg-white/10 hover:bg-white/20 rounded px-3 py-2 disabled:opacity-40">
+              Create account
+            </button>
+          </div>
         </div>
       </Shell>
     );
