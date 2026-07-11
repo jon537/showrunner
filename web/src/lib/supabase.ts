@@ -11,7 +11,7 @@ if (!url || !anon) {
 export const supabase = createClient(url, anon);
 
 // Call an edge function with the current user session attached.
-export async function invoke<T = unknown>(name: string, body: unknown): Promise<T> {
+export async function invoke<T = unknown>(name: string, body: Record<string, unknown>): Promise<T> {
   const { data, error } = await supabase.functions.invoke(name, { body });
   if (error) throw error;
   return data as T;
