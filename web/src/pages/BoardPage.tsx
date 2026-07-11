@@ -6,7 +6,7 @@ interface Episode { id: string; working_title: string | null; status: string; cr
 interface PrepShot { seq: number; mode: string; prompt?: string; slots?: string[]; beat?: string; }
 
 export function BoardPage() {
-  const project = useProject();
+  const { project } = useProject();
   const [eps, setEps] = useState<Episode[]>([]);
   const [prep, setPrep] = useState<Record<string, PrepShot[]>>({});
   const [busy, setBusy] = useState<string | null>(null);

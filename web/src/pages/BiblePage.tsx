@@ -9,7 +9,7 @@ interface Asset {
 }
 
 export function BiblePage() {
-  const project = useProject();
+  const { project } = useProject();
   const [assets, setAssets] = useState<Asset[]>([]);
   const [kind, setKind] = useState<Kind>("character");
   const [name, setName] = useState("");
@@ -40,11 +40,23 @@ export function BiblePage() {
     finally { setBusy(null); }
   }
 
+  if (project && !project.style_locked) {
+    return (
+      <div className="max-w-md mt-10 space-y-2">
+        <h2 className="text-lg font-semibold">Set your Style first</h2>
+        <p className="text-sm opacity-70">
+          Every character, prop and location must be generated in the series' locked style.
+          Head to the <b>Style</b> tab (Step 1), define the look + aspect ratio, then come back here.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-lg font-semibold">Bible — {project?.name ?? "…"}</h2>
-        <p className="text-sm opacity-60">Build character, prop &amp; location reference sheets. Claude writes the prompt → Nano Banana renders the sheet.</p>
+        <p className="text-sm opacity-60">Every sheet is generated in your locked style. Claude enhances the prompt → Nano Banana renders it with the style plate as reference.</p>
       </div>
 
       <div className="flex flex-wrap gap-2 items-end bg-white/5 p-3 rounded">

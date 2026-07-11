@@ -21,8 +21,15 @@ Deno.serve(async (req) => {
     const sb = serviceClient();
 
     const { data: script, error: se } = await sb
-      .from("sr_scripts").select("*").eq("id", script_id).single();
+      .from("sr_scripts")
+      .select("*, sr_projects(style_guide, aspect_ratio, style_locked)")
+      .eq("id", script_id).single();
     if (se || !script) return json({ error: "script not found" }, 404);
+
+    const proj = script.sr_projects;
+    if (!proj?.style_locked)
+      return json({ error: "Set the series STYLE first (Step 1)." }, 400);
+    const aspect = proj.aspect_ratio === "16:9" ? "16:9" : "9:16";
 
     const { data: assets } = await sb
       .from("sr_assets").select("id,kind,name,description")
@@ -36,11 +43,14 @@ Deno.serve(async (req) => {
       "beats of ~15 seconds each. Each beat becomes one Seedance clip. For every " +
       "beat write a vivid, self-contained visual prompt (camera, action, mood) " +
       "that CUTS CLEANLY at its edges (audio and visual) so the 4 clips join with " +
-      "no seam. Only reference characters/props/locations that exist in the Bible, " +
-      "by their exact names, and list them in bound_asset_names so the renderer " +
-      "loads the right reference sheets. Return ONLY JSON.";
+      "no seam. Every seedance_prompt MUST obey the STYLE GUIDE verbatim and be " +
+      `composed for ${aspect}. Only reference characters/props/locations that exist ` +
+      "in the Bible, by their exact names, and list them in bound_asset_names so " +
+      "the renderer loads the right reference sheets. Return ONLY JSON.";
 
     const user =
+      `STYLE GUIDE (authoritative — embed in every prompt):\n${proj.style_guide}\n\n` +
+      `ASPECT: ${aspect}\n\n` +
       `BIBLE (only these may appear):\n${bible || "(none yet)"}\n\n` +
       `SCRIPT:\n${script.raw_text}\n\n` +
       `Return JSON: {"working_title": string, "beats": [` +

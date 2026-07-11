@@ -74,6 +74,54 @@ export function extractJson<T = unknown>(text: string): T {
   return JSON.parse(raw.slice(start)) as T;
 }
 
+function b64ToBytes(b64: string): Uint8Array {
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+// Fetch an image URL and return { mimeType, b64 } — used to pass the style plate
+// as a reference into subsequent generations.
+export async function fetchImageB64(url: string): Promise<{ mimeType: string; b64: string }> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`fetch image ${res.status}`);
+  const mimeType = res.headers.get("content-type") ?? "image/png";
+  const buf = new Uint8Array(await res.arrayBuffer());
+  let bin = "";
+  for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
+  return { mimeType, b64: btoa(bin) };
+}
+
+// Nano Banana (Gemini image). Optional reference images are passed as inlineData
+// parts — this is how the project's STYLE PLATE gets injected into every render
+// so characters/props/locations all share one look. Returns PNG bytes.
+export async function nanoBanana(
+  prompt: string,
+  refs: { mimeType: string; b64: string }[] = [],
+): Promise<Uint8Array> {
+  const key = Deno.env.get("GEMINI_API_KEY");
+  if (!key) throw new Error("GEMINI_API_KEY not set");
+  const model = Deno.env.get("NANO_BANANA_MODEL") ?? "gemini-2.5-flash-image";
+  const url =
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+
+  const parts: unknown[] = [{ text: prompt }];
+  for (const r of refs) parts.push({ inlineData: { mimeType: r.mimeType, data: r.b64 } });
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ contents: [{ parts }] }),
+  });
+  if (!res.ok) throw new Error(`Nano Banana ${res.status}: ${await res.text()}`);
+  const data = await res.json();
+  const outParts = data?.candidates?.[0]?.content?.parts ?? [];
+  const img = outParts.find((p: { inlineData?: { data: string } }) => p.inlineData)?.inlineData?.data;
+  if (!img) throw new Error("no image in Nano Banana response");
+  return b64ToBytes(img);
+}
+
 // Upload bytes to the public 'showrunner' bucket, return the public URL.
 export async function uploadPublic(
   sb: ReturnType<typeof serviceClient>,

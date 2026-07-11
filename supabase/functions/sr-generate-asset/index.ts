@@ -1,41 +1,13 @@
-// sr-generate-asset — the SETUP step (Phase 1A). For one Bible asset:
-//   1. Claude writes a style-locked image prompt (if not supplied)
-//   2. Nano Banana (Gemini image) renders the reference sheet
-//   3. store the sheet in the bucket + mark the asset 'ready'
+// sr-generate-asset — Bible builder (Phase 1A). For one character/prop/location:
+//   1. ENFORCE the project style is locked (Step 1 must be done first).
+//   2. AI enhancer: Claude writes a detailed prompt = STYLE GUIDE + this asset.
+//   3. Nano Banana renders it, WITH THE STYLE PLATE injected as a reference image
+//      so every asset shares the exact same look + aspect ratio.
 //
 // POST { asset_id, regenerate?: boolean }  ->  { asset_id, prompt, image_url }
-//
-// NOTE: "Nano Banana" == Gemini image model. Endpoint/model id are env-driven so
-// you can point this at Google's Generative Language API or Higgsfield's Nano
-// Banana, whichever you settle on. Confirm the exact response shape in setup.
-import { CORS, json, preflight, serviceClient, claude, uploadPublic } from "../_shared/util.ts";
-
-function b64ToBytes(b64: string): Uint8Array {
-  const bin = atob(b64);
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  return out;
-}
-
-// Gemini image generation (Nano Banana). Returns base64 PNG.
-async function nanoBanana(prompt: string): Promise<string> {
-  const key = Deno.env.get("GEMINI_API_KEY");
-  if (!key) throw new Error("GEMINI_API_KEY not set");
-  const model = Deno.env.get("NANO_BANANA_MODEL") ?? "gemini-2.5-flash-image";
-  const url =
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
-  });
-  if (!res.ok) throw new Error(`Nano Banana ${res.status}: ${await res.text()}`);
-  const data = await res.json();
-  const parts = data?.candidates?.[0]?.content?.parts ?? [];
-  const img = parts.find((p: { inlineData?: { data: string } }) => p.inlineData)?.inlineData?.data;
-  if (!img) throw new Error("no image in Nano Banana response");
-  return img;
-}
+import {
+  CORS, json, preflight, serviceClient, claude, nanoBanana, uploadPublic, fetchImageB64,
+} from "../_shared/util.ts";
 
 Deno.serve(async (req) => {
   const pf = preflight(req); if (pf) return pf;
@@ -45,47 +17,58 @@ Deno.serve(async (req) => {
 
     const sb = serviceClient();
     const { data: asset, error } = await sb
-      .from("sr_assets").select("*, sr_projects(style_note)").eq("id", asset_id).single();
+      .from("sr_assets")
+      .select("*, sr_projects(style_guide, style_image_url, aspect_ratio, style_locked)")
+      .eq("id", asset_id).single();
     if (error || !asset) return json({ error: "asset not found" }, 404);
+
+    const proj = asset.sr_projects;
+    if (!proj?.style_locked) {
+      return json({ error: "Set the series STYLE first (Step 1) — nothing can be generated until the style is locked." }, 400);
+    }
+    const aspect = proj.aspect_ratio === "16:9" ? "16:9" : "9:16";
 
     await sb.from("sr_assets").update({ status: "generating" }).eq("id", asset_id);
 
-    // 1. style-locked prompt (reuse stored one unless regenerating)
+    // 1. AI enhancer: detailed, style-locked prompt for this asset.
     let prompt = asset.gen_prompt;
     if (!prompt || regenerate) {
-      const style = asset.sr_projects?.style_note ?? "";
-      prompt = await claude({
+      prompt = (await claude({
         system:
-          "You write image-generation prompts for a character/prop/location " +
-          "reference sheet. Output ONE prompt only, no preamble. Describe a clean " +
-          "reference sheet: the subject from multiple angles, consistent wardrobe/" +
-          "design, neutral background, so it can anchor a video model's appearance.",
+          "You write a single image-generation prompt for ONE reference sheet " +
+          "(character, prop, or location) that MUST obey the series style guide " +
+          "verbatim. Show the subject clearly for use as a video reference: a " +
+          "character from multiple angles with consistent wardrobe; a prop/location " +
+          "from a clear representative angle. Neutral background. Output ONE prompt, " +
+          "no preamble. The style guide is authoritative — do not deviate.",
         user:
-          `SERIES STYLE: ${style}\nKIND: ${asset.kind}\nNAME: ${asset.name}\n` +
+          `STYLE GUIDE (authoritative):\n${proj.style_guide}\n\n` +
+          `ASPECT: ${aspect}\nKIND: ${asset.kind}\nNAME: ${asset.name}\n` +
           `DETAILS: ${asset.description ?? ""}\n\nWrite the reference-sheet prompt.`,
         maxTokens: 500,
-      });
-      prompt = prompt.trim();
+      })).trim();
     }
 
-    // 2. render the sheet
-    const imgB64 = await nanoBanana(prompt);
-    const bytes = b64ToBytes(imgB64);
+    // 2. Render WITH the style plate as a visual reference (the consistency lock).
+    const refs = proj.style_image_url ? [await fetchImageB64(proj.style_image_url)] : [];
+    const fullPrompt =
+      `${prompt}\n\nMatch the visual style of the provided reference image exactly ` +
+      `(medium, palette, line, lighting). Composition ${aspect}.`;
+    const bytes = await nanoBanana(fullPrompt, refs);
 
-    // 3. store + mark ready
-    const path = `${asset.project_id}/bible/${asset.kind}/${asset_id}.png`;
-    const image_url = await uploadPublic(sb, path, bytes, "image/png");
+    const image_url = await uploadPublic(
+      sb, `${asset.project_id}/bible/${asset.kind}/${asset_id}.png`, bytes, "image/png",
+    );
 
-    const refs = Array.isArray(asset.reference_image_urls) ? asset.reference_image_urls : [];
+    const existing = Array.isArray(asset.reference_image_urls) ? asset.reference_image_urls : [];
     await sb.from("sr_assets").update({
       gen_prompt: prompt,
-      reference_image_urls: [...new Set([image_url, ...refs])],
+      reference_image_urls: [...new Set([image_url, ...existing])],
       status: "ready",
     }).eq("id", asset_id);
 
     return json({ asset_id, prompt, image_url });
   } catch (e) {
-    // best-effort: leave the asset visible for retry
     return json({ error: String(e) }, 500);
   }
 });

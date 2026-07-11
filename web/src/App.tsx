@@ -1,15 +1,16 @@
 import { useEffect, useState } from "react";
 import { supabase, supabaseConfigured } from "./lib/supabase";
+import { StylePage } from "./pages/StylePage";
 import { BiblePage } from "./pages/BiblePage";
 import { ScriptPage } from "./pages/ScriptPage";
 import { BoardPage } from "./pages/BoardPage";
 
-type Tab = "bible" | "script" | "board";
+type Tab = "style" | "bible" | "script" | "board";
 
 export function App() {
   const [session, setSession] = useState<unknown>(null);
   const [ready, setReady] = useState(false);
-  const [tab, setTab] = useState<Tab>("bible");
+  const [tab, setTab] = useState<Tab>("style");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
@@ -84,7 +85,7 @@ export function App() {
   return (
     <Shell>
       <nav className="flex gap-1 mb-6 text-sm">
-        {(["bible", "script", "board"] as Tab[]).map(t => (
+        {(["style", "bible", "script", "board"] as Tab[]).map(t => (
           <button key={t} onClick={() => setTab(t)}
             className={`px-3 py-1.5 rounded capitalize ${tab === t ? "bg-emerald-600" : "bg-white/5 hover:bg-white/10"}`}>
             {t}
@@ -93,6 +94,7 @@ export function App() {
         <button className="ml-auto px-3 py-1.5 rounded bg-white/5 hover:bg-white/10"
           onClick={() => supabase.auth.signOut()}>Sign out</button>
       </nav>
+      {tab === "style" && <StylePage />}
       {tab === "bible" && <BiblePage />}
       {tab === "script" && <ScriptPage />}
       {tab === "board" && <BoardPage />}

@@ -5,7 +5,7 @@ import { useProject } from "../lib/useProject";
 interface Shot { seq: number; beat_text: string; seedance_prompt: string; }
 
 export function ScriptPage() {
-  const project = useProject();
+  const { project } = useProject();
   const [title, setTitle] = useState("");
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
