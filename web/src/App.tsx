@@ -6,8 +6,9 @@ import { StylePage } from "./pages/StylePage";
 import { BiblePage } from "./pages/BiblePage";
 import { ScriptPage } from "./pages/ScriptPage";
 import { BoardPage } from "./pages/BoardPage";
+import { LibraryPage } from "./pages/LibraryPage";
 
-type Tab = "story" | "style" | "bible" | "script" | "board";
+type Tab = "story" | "style" | "bible" | "script" | "board" | "library";
 
 export function App() {
   const [session, setSession] = useState<unknown>(null);
@@ -131,25 +132,56 @@ export function App() {
   );
 }
 
+// Which tabs a project shows depends on its pipeline:
+//   microdrama   = full creation engine + (later) publish
+//   distribution = bring finished video; publish half only
+const PIPELINE_TABS: Record<string, Tab[]> = {
+  microdrama: ["story", "style", "bible", "script", "board"],
+  distribution: ["library"],
+};
+
+function PipelinePicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const opts = [
+    { id: "microdrama", icon: "🎬", label: "Microdrama", desc: "Full engine: story → style → bible → script → render → publish" },
+    { id: "distribution", icon: "📤", label: "Distribute only", desc: "You bring finished video; thumbnails, metadata & publishing only" },
+  ];
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      {opts.map(o => (
+        <button key={o.id} onClick={() => onChange(o.id)}
+          className={`text-left rounded p-3 border ${value === o.id ? "border-emerald-500 bg-emerald-600/10" : "border-white/10 bg-white/5 hover:bg-white/10"}`}>
+          <div className="text-sm font-medium">{o.icon} {o.label}</div>
+          <div className="text-xs opacity-60 mt-1">{o.desc}</div>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function Workspace() {
   const { projects, project, loading, selectProject, createProject, renameProject } = useProjectContext();
   const [tab, setTab] = useState<Tab>("story");
   const [newName, setNewName] = useState("");
+  const [newPipeline, setNewPipeline] = useState("microdrama");
   const [creating, setCreating] = useState(false);
   const [renaming, setRenaming] = useState(false);
 
+  const tabs = PIPELINE_TABS[project?.pipeline ?? "microdrama"] ?? PIPELINE_TABS.microdrama;
+  const activeTab = tabs.includes(tab) ? tab : tabs[0];
+
   if (loading) return <Shell><p className="opacity-60">Loading projects…</p></Shell>;
 
-  // No projects yet → name your first one.
+  // No projects yet → choose inputs/outputs + name it.
   if (!project) {
     return (
       <Shell>
-        <div className="max-w-sm mx-auto mt-24 space-y-3">
-          <h1 className="text-2xl font-semibold">Name your first project</h1>
-          <p className="text-sm opacity-60">A project is one series — its own style, bible and episodes.</p>
-          <input className="w-full bg-white/5 rounded px-3 py-2" placeholder="e.g. Midnight Diner"
+        <div className="max-w-md mx-auto mt-24 space-y-4">
+          <h1 className="text-2xl font-semibold">Create your first project</h1>
+          <p className="text-sm opacity-60">Choose what this project is — its inputs and outputs — then name it.</p>
+          <PipelinePicker value={newPipeline} onChange={setNewPipeline} />
+          <input className="w-full bg-white/5 rounded px-3 py-2" placeholder="project name"
             value={newName} onChange={e => setNewName(e.target.value)} />
-          <button disabled={!newName.trim()} onClick={() => createProject(newName.trim())}
+          <button disabled={!newName.trim()} onClick={() => createProject(newName.trim(), newPipeline)}
             className="w-full bg-emerald-600 hover:bg-emerald-500 rounded px-3 py-2 disabled:opacity-40">
             Create project
           </button>
@@ -182,36 +214,48 @@ function Workspace() {
           </>
         )}
         {creating ? (
-          <input autoFocus placeholder="new project name…"
-            className="bg-white/10 rounded px-2 py-1"
-            value={newName} onChange={e => setNewName(e.target.value)}
-            onKeyDown={e => {
-              if (e.key === "Enter" && newName.trim()) { createProject(newName.trim()); setNewName(""); setCreating(false); setTab("style"); }
-              if (e.key === "Escape") { setCreating(false); setNewName(""); }
-            }} />
+          <>
+            <select value={newPipeline} onChange={e => setNewPipeline(e.target.value)}
+              className="bg-white/10 rounded px-2 py-1">
+              <option value="microdrama">🎬 microdrama</option>
+              <option value="distribution">📤 distribute-only</option>
+            </select>
+            <input autoFocus placeholder="new project name…"
+              className="bg-white/10 rounded px-2 py-1"
+              value={newName} onChange={e => setNewName(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === "Enter" && newName.trim()) {
+                  createProject(newName.trim(), newPipeline); setNewName(""); setCreating(false);
+                  setTab(newPipeline === "distribution" ? "library" : "story");
+                }
+                if (e.key === "Escape") { setCreating(false); setNewName(""); }
+              }} />
+          </>
         ) : (
           <button onClick={() => setCreating(true)}
             className="px-2 py-1 rounded bg-white/5 hover:bg-white/10">＋ New</button>
         )}
+        <span className="text-xs opacity-40">{project.pipeline === "distribution" ? "📤 distribute-only" : "🎬 microdrama"}</span>
         <button className="ml-auto px-3 py-1.5 rounded bg-white/5 hover:bg-white/10"
           onClick={() => supabase.auth.signOut()}>Sign out</button>
       </div>
 
       {/* Tabs */}
       <nav className="flex gap-1 mb-6 text-sm">
-        {(["story", "style", "bible", "script", "board"] as Tab[]).map(t => (
+        {tabs.map(t => (
           <button key={t} onClick={() => setTab(t)}
-            className={`px-3 py-1.5 rounded capitalize ${tab === t ? "bg-emerald-600" : "bg-white/5 hover:bg-white/10"}`}>
+            className={`px-3 py-1.5 rounded capitalize ${activeTab === t ? "bg-emerald-600" : "bg-white/5 hover:bg-white/10"}`}>
             {t}
           </button>
         ))}
       </nav>
 
-      {tab === "story" && <StoryPage goStyle={() => setTab("style")} />}
-      {tab === "style" && <StylePage onApprove={() => setTab("bible")} />}
-      {tab === "bible" && <BiblePage />}
-      {tab === "script" && <ScriptPage />}
-      {tab === "board" && <BoardPage />}
+      {activeTab === "story" && <StoryPage goStyle={() => setTab("style")} />}
+      {activeTab === "style" && <StylePage onApprove={() => setTab("bible")} />}
+      {activeTab === "bible" && <BiblePage />}
+      {activeTab === "script" && <ScriptPage />}
+      {activeTab === "board" && <BoardPage />}
+      {activeTab === "library" && <LibraryPage />}
     </Shell>
   );
 }

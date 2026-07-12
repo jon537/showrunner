@@ -4,6 +4,7 @@
 //
 // POST { project_id }  ->  { episode_id, seq, working_title, caption, cliffhanger, shots }
 import { CORS, json, preflight, serviceClient, claude, extractJson } from "../_shared/util.ts";
+import { WRITER_FORMAT } from "../_shared/format.ts";
 
 interface Shot {
   seq: number;
@@ -22,46 +23,6 @@ interface Written {
   story_state: string;        // updated rolling memory
 }
 
-// The baked-in "deep dive" — the micro-drama formula, applied every episode.
-const FORMAT = `
-You are the head writer of a NEVER-ENDING vertical micro-drama series for African
-audiences (South Africa / Nigeria / Kenya) published on YouTube & TikTok. You write
-in SHOTS, not scenes. Rules — obey every one:
-
-STRUCTURE
-- One EPISODE = exactly N shots. Each shot is ONE 15-second Seedance generation =
-  ONE beat: a single gesture, line, or status-shift. Do not cram.
-- The beat arc across the episode: SHOT 1 = HOOK (in the first ~2 seconds catch &
-  twist the previous cliffhanger, then escalate), middle shots ESCALATE then TURN,
-  FINAL shot = CLIFF — the last frame is an unresolved detonation.
-- NEVER resolve the story. Every episode ends mid-tension so it can always continue.
-- Cut between angles shot to shot (wide / reverse / reaction / insert) — cutting
-  hides AI drift. Only set chain_from_prev=true when a shot is a CONTINUOUS action
-  from the previous one (e.g. a wrist-grab); otherwise it's a clean cut.
-
-EMOTIONAL ENGINE (this is the fuel — not action)
-- Betrayal, injustice, secret power/wealth, family/lobola/inheritance, vindication.
-- Addictive, legible in seconds, skews to women. Deliver world-building in tiny
-  increments, never exposition.
-
-DIALOGUE
-- Max 1–2 SHORT lines per shot (15s won't carry more clean lip-sync).
-- Put the biggest / most sync-risky line OFF-SCREEN over a reaction shot.
-- Captions are added in post — never bake caption text into the prompt.
-
-PROMPT FORMAT (each seedance_prompt, every time)
-- Name the Bible characters present and lock identity: "keep consistent facial
-  features; do not blend the characters." Reference only characters that exist in
-  the Bible, by their exact names, and list them in bound_asset_names.
-- Embed the STYLE GUIDE verbatim. Describe scene + action. Specify CAMERA and the
-  END FRAME. State the aspect ratio. Describe the audio/dialogue (mark off-screen).
-
-CONTINUITY
-- Continue from STORY SO FAR and pay off / advance the PREVIOUS CLIFFHANGER.
-- Output an updated, compact STORY SO FAR (a few sentences: who, relationships,
-  open threads, what just changed) and the NEW cliffhanger.
-
-Return ONLY JSON.`;
 
 Deno.serve(async (req) => {
   const pf = preflight(req); if (pf) return pf;
@@ -110,7 +71,7 @@ Deno.serve(async (req) => {
       `"dialogue":str,"chain_from_prev":bool,"bound_asset_names":[str]}, ... ${nShots} ],` +
       `"cliffhanger":str,"story_state":str}`;
 
-    const out = await claude({ system: FORMAT.replace("N shots", `${nShots} shots`), user, maxTokens: 4000 });
+    const out = await claude({ system: WRITER_FORMAT.replace("N shots", `${nShots} shots`), user, maxTokens: 4000 });
     const w = extractJson<Written>(out);
     if (!w.shots || w.shots.length !== nShots)
       return json({ error: `writer returned ${w.shots?.length ?? 0} shots, expected ${nShots}`, raw: out }, 422);

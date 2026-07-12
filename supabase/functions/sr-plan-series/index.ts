@@ -7,6 +7,7 @@
 //
 // POST { project_id, episodes? }  ->  { episodes, characters, props, locations }
 import { CORS, json, preflight, serviceClient, claude, extractJson } from "../_shared/util.ts";
+import { MAPPER_FORMAT } from "../_shared/format.ts";
 
 interface MapEntry { ep: number; logline: string; cliff: string; }
 interface ManifestChar { name: string; description: string; detailed_prompt: string; voice_profile: string; }
@@ -28,13 +29,7 @@ Deno.serve(async (req) => {
 
     // ---- 1. Season map ----
     const mapOut = await claude({
-      system:
-        "You are the showrunner of a never-ending 60-second vertical micro-drama. " +
-        "Map the season as brief episode loglines. Each episode = hook -> escalate " +
-        "-> turn -> CLIFF; no episode ever resolves the story. Build one escalating " +
-        "serialized thread with arcs every ~10-15 episodes (reveal, reversal, new " +
-        "antagonist, temporary victory that curdles). Keep each logline to ONE " +
-        "sentence and each cliff to ONE short sentence. Return ONLY JSON.",
+      system: MAPPER_FORMAT,
       user:
         `PREMISE:\n${proj.premise}\n\nMARKET: ${proj.market}\n` +
         (proj.series_notes ? `NOTES: ${proj.series_notes}\n` : "") +

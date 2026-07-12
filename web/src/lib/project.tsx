@@ -4,6 +4,7 @@ import { supabase } from "./supabase";
 export interface Project {
   id: string;
   name: string;
+  pipeline: "microdrama" | "distribution";
   style_brief: string | null;
   style_guide: string | null;
   style_image_url: string | null;
@@ -11,7 +12,7 @@ export interface Project {
   style_locked: boolean;
 }
 
-const COLS = "id,name,style_brief,style_guide,style_image_url,aspect_ratio,style_locked";
+const COLS = "id,name,pipeline,style_brief,style_guide,style_image_url,aspect_ratio,style_locked";
 const KEY = "sr_active_project";
 
 interface Ctx {
@@ -20,7 +21,7 @@ interface Ctx {
   loading: boolean;
   reload: () => Promise<void>;
   selectProject: (id: string) => void;
-  createProject: (name: string) => Promise<void>;
+  createProject: (name: string, pipeline?: string) => Promise<void>;
   renameProject: (id: string, name: string) => Promise<void>;
 }
 
@@ -51,9 +52,9 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     setActiveId(id);
   }, []);
 
-  const createProject = useCallback(async (name: string) => {
+  const createProject = useCallback(async (name: string, pipeline: string = "microdrama") => {
     const { data } = await supabase.from("sr_projects")
-      .insert({ name, instance: "personal", kind: "animation" }).select(COLS).single();
+      .insert({ name, instance: "personal", kind: "animation", pipeline }).select(COLS).single();
     if (data) {
       setProjects(p => [...p, data as Project]);
       selectProject((data as Project).id);
