@@ -93,9 +93,12 @@ export async function fetchImageB64(url: string): Promise<{ mimeType: string; b6
   return { mimeType, b64: btoa(bin) };
 }
 
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+
 // Nano Banana (Gemini image). Optional reference images are passed as inlineData
 // parts — this is how the project's STYLE PLATE gets injected into every render
 // so characters/props/locations all share one look. Returns PNG bytes.
+// Retries transient 5xx / 429 (image gen throws these intermittently).
 export async function nanoBanana(
   prompt: string,
   refs: { mimeType: string; b64: string }[] = [],
@@ -108,18 +111,30 @@ export async function nanoBanana(
 
   const parts: unknown[] = [{ text: prompt }];
   for (const r of refs) parts.push({ inlineData: { mimeType: r.mimeType, data: r.b64 } });
+  const body = JSON.stringify({ contents: [{ parts }] });
 
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ contents: [{ parts }] }),
-  });
-  if (!res.ok) throw new Error(`Nano Banana ${res.status}: ${await res.text()}`);
-  const data = await res.json();
-  const outParts = data?.candidates?.[0]?.content?.parts ?? [];
-  const img = outParts.find((p: { inlineData?: { data: string } }) => p.inlineData)?.inlineData?.data;
-  if (!img) throw new Error("no image in Nano Banana response");
-  return b64ToBytes(img);
+  let last = "";
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body,
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const outParts = data?.candidates?.[0]?.content?.parts ?? [];
+      const img = outParts.find((p: { inlineData?: { data: string } }) => p.inlineData)?.inlineData?.data;
+      if (img) return b64ToBytes(img);
+      // No image (often a safety block or empty candidate) — retry once or two.
+      last = "no image in Nano Banana response";
+    } else {
+      last = `Nano Banana ${res.status}: ${await res.text()}`;
+      // Only retry transient server/rate errors; fail fast on 4xx client errors.
+      if (res.status < 500 && res.status !== 429) throw new Error(last);
+    }
+    await sleep(700 * (attempt + 1));
+  }
+  throw new Error(last || "Nano Banana failed after retries");
 }
 
 // Upload bytes to the public 'showrunner' bucket, return the public URL.
