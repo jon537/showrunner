@@ -1,10 +1,17 @@
 import { useEffect, useState } from "react";
-import { supabase } from "../lib/supabase";
+import { supabase, invoke } from "../lib/supabase";
 import { useProjectContext } from "../lib/project";
 
+interface Social {
+  youtube?: { title: string; description: string; tags: string[] };
+  tiktok?: { caption: string; hashtags: string[] };
+  instagram?: { caption: string; hashtags: string[] };
+  thumbnail?: { headline: string };
+}
 interface Episode {
   id: string; seq: number | null; working_title: string | null;
   status: string; final_video_url: string | null; created_at: string;
+  metadata: { social?: Social } | null;
 }
 
 // The entry point of the DISTRIBUTION half: finished videos come in here
@@ -19,12 +26,20 @@ export function LibraryPage() {
   async function load() {
     if (!project) return;
     const { data } = await supabase.from("sr_episodes")
-      .select("id,seq,working_title,status,final_video_url,created_at")
+      .select("id,seq,working_title,status,final_video_url,created_at,metadata")
       .eq("project_id", project.id).not("final_video_url", "is", null)
       .order("created_at", { ascending: false });
     setEps((data as Episode[]) ?? []);
   }
   useEffect(() => { load(); }, [project?.id]);
+
+  const [metaBusy, setMetaBusy] = useState<string | null>(null);
+  async function genMeta(id: string) {
+    setMetaBusy(id);
+    try { await invoke("sr-metadata", { episode_id: id }); await load(); }
+    catch (e) { alert("Metadata failed: " + String(e)); }
+    finally { setMetaBusy(null); }
+  }
 
   async function upload(file: File) {
     if (!project) return;
@@ -72,6 +87,19 @@ export function LibraryPage() {
             </div>
             {ep.final_video_url && (
               <video src={ep.final_video_url} controls className="w-full rounded max-h-96 bg-black" />
+            )}
+            <button disabled={metaBusy === ep.id} onClick={() => genMeta(ep.id)}
+              className="text-sm bg-white/10 hover:bg-white/20 rounded px-3 py-1 disabled:opacity-40">
+              {metaBusy === ep.id ? "writing metadata…" : ep.metadata?.social ? "↻ Regenerate metadata" : "Generate publish metadata"}
+            </button>
+            {ep.metadata?.social && (
+              <div className="text-xs space-y-1 bg-black/30 rounded p-2">
+                <p><b className="opacity-50">YT</b> {ep.metadata.social.youtube?.title}</p>
+                <p className="opacity-70">{ep.metadata.social.youtube?.description}</p>
+                <p><b className="opacity-50">TikTok</b> {ep.metadata.social.tiktok?.caption} <span className="opacity-50">{ep.metadata.social.tiktok?.hashtags?.join(" ")}</span></p>
+                <p><b className="opacity-50">IG</b> {ep.metadata.social.instagram?.caption} <span className="opacity-50">{ep.metadata.social.instagram?.hashtags?.join(" ")}</span></p>
+                <p><b className="opacity-50">Thumb</b> {ep.metadata.social.thumbnail?.headline}</p>
+              </div>
             )}
           </div>
         ))}
