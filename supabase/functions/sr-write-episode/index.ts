@@ -79,14 +79,21 @@ Deno.serve(async (req) => {
     const nShots = proj.shots_per_episode || 4;
 
     const { data: assets } = await sb.from("sr_assets")
-      .select("id,kind,name,description").eq("project_id", project_id).eq("status", "ready");
+      .select("id,kind,name,description,voice_profile").eq("project_id", project_id).eq("status", "ready");
     if (!assets?.length)
       return json({ error: "Build at least one Bible character/prop/location (sheet ready) first." }, 400);
-    const bible = assets.map(a => `- [${a.kind}] ${a.name}: ${a.description ?? ""}`).join("\n");
+    const bible = assets.map(a =>
+      `- [${a.kind}] ${a.name}: ${a.description ?? ""}` +
+      (a.voice_profile ? ` | VOICE: ${a.voice_profile}` : "")).join("\n");
 
     const { count } = await sb.from("sr_episodes")
       .select("id", { count: "exact", head: true }).eq("project_id", project_id);
     const seq = (count ?? 0) + 1;
+
+    // If the season was mapped upfront, steer this episode by its planned slot.
+    const mapEntry = Array.isArray(proj.season_map)
+      ? (proj.season_map as { ep: number; logline: string; cliff: string }[]).find(m => m.ep === seq)
+      : null;
 
     const user =
       `SERIES PREMISE:\n${proj.premise}\n\nMARKET: ${proj.market}\n` +
@@ -95,6 +102,8 @@ Deno.serve(async (req) => {
       `ASPECT: ${aspect}\n\nBIBLE (only these characters/props/locations may appear):\n${bible}\n\n` +
       `STORY SO FAR:\n${proj.story_state || "(none — this is the PILOT, Episode 1. Establish the world and the central injustice, and end on the first cliffhanger.)"}\n\n` +
       `PREVIOUS CLIFFHANGER:\n${proj.next_cliffhanger || "(none — write the pilot)"}\n\n` +
+      (mapEntry ? `PLANNED SLOT (season map — follow it): EP ${seq}: ${mapEntry.logline} → cliff: ${mapEntry.cliff}\n\n` : "") +
+      `When a character speaks, direct the audio using their VOICE profile from the Bible.\n` +
       `Write EPISODE ${seq} as EXACTLY ${nShots} shots.\n` +
       `Return JSON: {"working_title":str,"caption":str,"shots":[{"seq":1,` +
       `"beat_function":"hook|escalate|turn|cliff","beat_text":str,"seedance_prompt":str,` +

@@ -6,7 +6,7 @@ import { ZoomImg } from "../components/ZoomImg";
 type Kind = "character" | "prop" | "location";
 interface Asset {
   id: string; kind: Kind; name: string; description: string | null;
-  ref_slot: number | null; status: string;
+  ref_slot: number | null; status: string; voice_profile: string | null;
   options: string[]; chosen_image_url: string | null; reference_image_urls: string[];
 }
 
@@ -110,6 +110,9 @@ export function BiblePage() {
                 <span className="opacity-40">{a.description}</span>
                 <span className="ml-auto text-xs px-2 py-0.5 rounded bg-black/40 opacity-70">{a.status}</span>
               </div>
+              {a.voice_profile && (
+                <p className="text-xs opacity-50">🎙 {a.voice_profile}</p>
+              )}
 
               {/* READY — the locked reference sheet */}
               {a.status === "ready" && a.reference_image_urls?.[0] && (

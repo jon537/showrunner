@@ -31,8 +31,11 @@ Deno.serve(async (req) => {
     if (proj?.style_image_url) refs.push(await fetchImageB64(proj.style_image_url));
 
     const angles = asset.kind === "character"
-      ? "front, 3/4, profile, and back views"
-      : "several clear representative angles";
+      ? "FULL BODY head-to-toe front view, full body 3/4 view, full body profile, " +
+        "and back view, PLUS a face close-up panel. Show complete wardrobe including " +
+        "shoes, full hairstyle, jewelry/accessories and hands — every detail visible " +
+        "and identical across all panels"
+      : "several clear representative angles plus a detail close-up";
     const hasPlate = refs.length > 1;
     const prompt =
       `Create a REFERENCE / TURNAROUND SHEET of a ${asset.kind}. ` +

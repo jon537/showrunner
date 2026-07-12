@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { supabase, supabaseConfigured } from "./lib/supabase";
 import { ProjectProvider, useProjectContext } from "./lib/project";
+import { StoryPage } from "./pages/StoryPage";
 import { StylePage } from "./pages/StylePage";
 import { BiblePage } from "./pages/BiblePage";
 import { ScriptPage } from "./pages/ScriptPage";
 import { BoardPage } from "./pages/BoardPage";
 
-type Tab = "style" | "bible" | "script" | "board";
+type Tab = "story" | "style" | "bible" | "script" | "board";
 
 export function App() {
   const [session, setSession] = useState<unknown>(null);
@@ -132,7 +133,7 @@ export function App() {
 
 function Workspace() {
   const { projects, project, loading, selectProject, createProject, renameProject } = useProjectContext();
-  const [tab, setTab] = useState<Tab>("style");
+  const [tab, setTab] = useState<Tab>("story");
   const [newName, setNewName] = useState("");
   const [creating, setCreating] = useState(false);
   const [renaming, setRenaming] = useState(false);
@@ -198,7 +199,7 @@ function Workspace() {
 
       {/* Tabs */}
       <nav className="flex gap-1 mb-6 text-sm">
-        {(["style", "bible", "script", "board"] as Tab[]).map(t => (
+        {(["story", "style", "bible", "script", "board"] as Tab[]).map(t => (
           <button key={t} onClick={() => setTab(t)}
             className={`px-3 py-1.5 rounded capitalize ${tab === t ? "bg-emerald-600" : "bg-white/5 hover:bg-white/10"}`}>
             {t}
@@ -206,6 +207,7 @@ function Workspace() {
         ))}
       </nav>
 
+      {tab === "story" && <StoryPage goStyle={() => setTab("style")} />}
       {tab === "style" && <StylePage onApprove={() => setTab("bible")} />}
       {tab === "bible" && <BiblePage />}
       {tab === "script" && <ScriptPage />}
