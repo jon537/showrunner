@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase, invoke } from "../lib/supabase";
-import { useProject } from "../lib/useProject";
+import { useProjectContext } from "../lib/project";
 
 type Kind = "character" | "prop" | "location";
 interface Asset {
@@ -9,7 +9,7 @@ interface Asset {
 }
 
 export function BiblePage() {
-  const { project } = useProject();
+  const { project } = useProjectContext();
   const [assets, setAssets] = useState<Asset[]>([]);
   const [kind, setKind] = useState<Kind>("character");
   const [name, setName] = useState("");

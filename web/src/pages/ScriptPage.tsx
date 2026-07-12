@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { supabase, invoke } from "../lib/supabase";
-import { useProject } from "../lib/useProject";
+import { useProjectContext } from "../lib/project";
 
 interface Shot { seq: number; beat_text: string; seedance_prompt: string; }
 
 export function ScriptPage() {
-  const { project } = useProject();
+  const { project } = useProjectContext();
   const [title, setTitle] = useState("");
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);

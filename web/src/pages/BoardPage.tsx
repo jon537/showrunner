@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { supabase, invoke } from "../lib/supabase";
-import { useProject } from "../lib/useProject";
+import { useProjectContext } from "../lib/project";
 
 interface Episode { id: string; working_title: string | null; status: string; created_at: string; }
 interface PrepShot { seq: number; mode: string; prompt?: string; slots?: string[]; beat?: string; }
 
 export function BoardPage() {
-  const { project } = useProject();
+  const { project } = useProjectContext();
   const [eps, setEps] = useState<Episode[]>([]);
   const [prep, setPrep] = useState<Record<string, PrepShot[]>>({});
   const [busy, setBusy] = useState<string | null>(null);

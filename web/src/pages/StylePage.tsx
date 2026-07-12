@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { invoke } from "../lib/supabase";
-import { useProject } from "../lib/useProject";
+import { useProjectContext } from "../lib/project";
 
 // STEP 1 — define the locked look for the whole series before anything else.
-export function StylePage() {
-  const { project, reload } = useProject();
+export function StylePage({ onApprove }: { onApprove: () => void }) {
+  const { project, reload } = useProjectContext();
   const [brief, setBrief] = useState("");
   const [aspect, setAspect] = useState<"9:16" | "16:9">("9:16");
   const [busy, setBusy] = useState(false);
@@ -57,23 +57,38 @@ export function StylePage() {
         </div>
 
         {err && <p className="text-amber-400 text-sm">{err}</p>}
-        <button disabled={busy} onClick={generate}
-          className="bg-emerald-600 hover:bg-emerald-500 rounded px-4 py-2 disabled:opacity-40">
-          {busy ? "enhancing + rendering style plate…" : locked ? "Regenerate style" : "Generate style"}
-        </button>
+        {!locked && (
+          <button disabled={busy} onClick={generate}
+            className="bg-emerald-600 hover:bg-emerald-500 rounded px-4 py-2 disabled:opacity-40">
+            {busy ? "enhancing + rendering style plate…" : "Generate style"}
+          </button>
+        )}
       </div>
 
       {locked && (
-        <div className="grid md:grid-cols-2 gap-4">
-          <div className="bg-white/5 rounded p-3">
-            <div className="text-xs opacity-40 mb-2">STYLE PLATE · {project?.aspect_ratio}</div>
-            {project?.style_image_url
-              ? <img src={project.style_image_url} className="w-full rounded" />
-              : <span className="text-xs opacity-40">no plate</span>}
+        <div className="space-y-4">
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="bg-white/5 rounded p-3">
+              <div className="text-xs opacity-40 mb-2">STYLE PLATE · {project?.aspect_ratio}</div>
+              {project?.style_image_url
+                ? <img src={project.style_image_url} className="w-full rounded" />
+                : <span className="text-xs opacity-40">no plate</span>}
+            </div>
+            <div className="bg-white/5 rounded p-3">
+              <div className="text-xs opacity-40 mb-2">STYLE GUIDE (injected everywhere)</div>
+              <p className="text-sm whitespace-pre-wrap opacity-80">{project?.style_guide}</p>
+            </div>
           </div>
-          <div className="bg-white/5 rounded p-3">
-            <div className="text-xs opacity-40 mb-2">STYLE GUIDE (injected everywhere)</div>
-            <p className="text-sm whitespace-pre-wrap opacity-80">{project?.style_guide}</p>
+          <div className="flex flex-wrap gap-2 items-center">
+            <button onClick={onApprove}
+              className="bg-emerald-600 hover:bg-emerald-500 rounded px-4 py-2 font-medium">
+              ✓ Looks good — continue to Bible →
+            </button>
+            <button disabled={busy} onClick={generate}
+              className="bg-white/10 hover:bg-white/20 rounded px-4 py-2 disabled:opacity-40">
+              {busy ? "regenerating…" : "↻ Try again"}
+            </button>
+            <span className="text-xs opacity-50">Edit the brief/aspect above and Try again, or continue.</span>
           </div>
         </div>
       )}
