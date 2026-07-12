@@ -33,9 +33,11 @@ export function BiblePage() {
     setName(""); setDesc(""); load();
   }
 
-  async function generate(id: string) {
+  // regenerate=true re-runs the AI enhancer so the prompt is rewritten against the
+  // CURRENT style guide (not the cached one) — a full recast in the new style.
+  async function generate(id: string, regenerate: boolean) {
     setBusy(id);
-    try { await invoke("sr-generate-asset", { asset_id: id }); await load(); }
+    try { await invoke("sr-generate-asset", { asset_id: id, regenerate }); await load(); }
     catch (e) { alert("Generate failed: " + String(e)); }
     finally { setBusy(null); }
   }
@@ -85,7 +87,7 @@ export function BiblePage() {
               <span className="opacity-40">[{a.kind} · slot {a.ref_slot}]</span><br />
               <b>{a.name}</b>
             </div>
-            <button disabled={busy === a.id} onClick={() => generate(a.id)}
+            <button disabled={busy === a.id} onClick={() => generate(a.id, a.status === "ready")}
               className="w-full text-sm bg-white/10 hover:bg-white/20 rounded px-2 py-1 disabled:opacity-40">
               {busy === a.id ? "generating…" : a.status === "ready" ? "regenerate" : "generate sheet"}
             </button>
