@@ -76,6 +76,17 @@ Seedance UI). If the Higgsfield/Seedance API supports loading multiple reference
 images programmatically, implement `submitRender()` in `sr-render/index.ts`, set
 `RENDER_MODE=api`, and rendering fully automates.
 
+## Go-live checklist (before "turning the machine on")
+- [ ] **Switch to Nano Banana Pro** — testing runs on standard Nano Banana to
+      save cost. Before production: Supabase → Edge Functions → Secrets → set
+      `NANO_BANANA_MODEL=gemini-3-pro-image-preview`, redeploy functions, and
+      **regenerate the style plate + all reference sheets** on Pro so the
+      canonical refs are top quality.
+- [ ] Regenerate any Bible sheets that were cast during testing.
+- [ ] Resolve Spike H (`RENDER_MODE=api` if the Higgsfield API supports multi-ref).
+- [ ] Voice lock (Phase 3): assign real TTS/cloned voices per character
+      (voice_profile text is the interim consistency mechanism).
+
 ---
 
 ## Push to your new GitHub repo
