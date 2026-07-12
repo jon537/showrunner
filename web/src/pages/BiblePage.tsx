@@ -51,6 +51,20 @@ export function BiblePage() {
     await supabase.from("sr_assets").update({ chosen_image_url: null, status: "casting" }).eq("id", id);
   });
 
+  // Upload your own image (e.g. Midjourney) — it joins the options; choose it,
+  // then the app builds the reference sheet from it just like a generated one.
+  const uploadOwn = (a: Asset, file: File) => run(a.id, async () => {
+    if (!project) return;
+    const ext = (file.name.split(".").pop() || "png").toLowerCase();
+    const path = `${project.id}/bible/${a.kind}/${a.id}/upload-${Date.now()}.${ext}`;
+    const { error } = await supabase.storage.from("showrunner")
+      .upload(path, file, { upsert: true, contentType: file.type || "image/png" });
+    if (error) throw error;
+    const url = supabase.storage.from("showrunner").getPublicUrl(path).data.publicUrl;
+    const opts = Array.isArray(a.options) ? a.options : [];
+    await supabase.from("sr_assets").update({ options: [...opts, url], status: "casting" }).eq("id", a.id);
+  });
+
   if (project && !project.style_locked) {
     return (
       <div className="max-w-md mt-10 space-y-2">
@@ -152,10 +166,17 @@ export function BiblePage() {
                       </div>
                     </>
                   )}
-                  <button disabled={working} onClick={() => genOptions(a.id)}
-                    className="text-sm bg-white/10 hover:bg-white/20 rounded px-3 py-1.5 disabled:opacity-40">
-                    {working ? "generating 2 options…" : opts.length ? "Generate 2 more" : "Generate 2 options"}
-                  </button>
+                  <div className="flex flex-wrap gap-2 items-center">
+                    <button disabled={working} onClick={() => genOptions(a.id)}
+                      className="text-sm bg-white/10 hover:bg-white/20 rounded px-3 py-1.5 disabled:opacity-40">
+                      {working ? "generating 2 options…" : opts.length ? "Generate 2 more" : "Generate 2 options"}
+                    </button>
+                    <label className={`text-sm bg-white/10 hover:bg-white/20 rounded px-3 py-1.5 cursor-pointer ${working ? "opacity-40 pointer-events-none" : ""}`}>
+                      ⤴ Upload your own
+                      <input type="file" accept="image/*" className="hidden"
+                        onChange={e => { const f = e.target.files?.[0]; if (f) uploadOwn(a, f); e.currentTarget.value = ""; }} />
+                    </label>
+                  </div>
                 </div>
               )}
             </div>
