@@ -33,12 +33,20 @@ Deno.serve(async (req) => {
     const angles = asset.kind === "character"
       ? "front, 3/4, profile, and back views"
       : "several clear representative angles";
+    const hasPlate = refs.length > 1;
     const prompt =
-      `Create a REFERENCE / TURNAROUND SHEET of the EXACT subject shown in the first ` +
-      `reference image — the SAME ${asset.kind} (identical face, design, wardrobe, colors). ` +
-      `Lay it out as ${angles} on a clean neutral background, evenly lit, consistent ` +
-      `across all angles. Match the visual style of the reference images exactly. ` +
-      `Composition ${aspect}. This sheet is the canonical reference for video generation.`;
+      `Create a REFERENCE / TURNAROUND SHEET of a ${asset.kind}. ` +
+      `SUBJECT: take the identity/design/wardrobe/colors from the FIRST reference ` +
+      `image and keep them the same across all angles. ` +
+      (hasPlate
+        ? `STYLE: RE-RENDER that subject in the visual style of the SECOND reference ` +
+          `image (the style plate) — its medium, palette, line, shading and lighting. ` +
+          `If the first image is in a different style, the SECOND image's style wins; ` +
+          `translate the subject into that style while preserving who/what it is. `
+        : ``) +
+      `Lay it out as ${angles} on a clean neutral background, evenly lit and ` +
+      `consistent across all angles. Composition ${aspect}. This sheet is the ` +
+      `canonical reference for video generation.`;
 
     const bytes = await nanoBanana(prompt, refs);
     const sheet_url = await uploadPublic(
