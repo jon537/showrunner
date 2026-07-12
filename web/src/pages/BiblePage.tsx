@@ -154,7 +154,7 @@ export function BiblePage() {
                   )}
                   <button disabled={working} onClick={() => genOptions(a.id)}
                     className="text-sm bg-white/10 hover:bg-white/20 rounded px-3 py-1.5 disabled:opacity-40">
-                    {working ? "generating 4 options…" : opts.length ? "Generate 4 more" : "Generate 4 options"}
+                    {working ? "generating 2 options…" : opts.length ? "Generate 2 more" : "Generate 2 options"}
                   </button>
                 </div>
               )}

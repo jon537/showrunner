@@ -12,7 +12,7 @@ Deno.serve(async (req) => {
   try {
     const { asset_id, n } = await req.json();
     if (!asset_id) return json({ error: "asset_id required" }, 400);
-    const count = Math.min(Math.max(Number(n) || 4, 1), 4);
+    const count = Math.min(Math.max(Number(n) || 2, 1), 4);
 
     const sb = serviceClient();
     const { data: asset, error } = await sb
