@@ -25,7 +25,9 @@ jobs:
           version: latest
       - name: Deploy all functions
         run: |
-          supabase functions deploy sr-generate-style --project-ref "${{ secrets.SUPABASE_PROJECT_ID }}"
-          supabase functions deploy sr-generate-asset --project-ref "${{ secrets.SUPABASE_PROJECT_ID }}"
-          supabase functions deploy sr-breakdown      --project-ref "${{ secrets.SUPABASE_PROJECT_ID }}"
-          supabase functions deploy sr-render         --project-ref "${{ secrets.SUPABASE_PROJECT_ID }}"
+          supabase functions deploy sr-generate-style   --project-ref "${{ secrets.SUPABASE_PROJECT_ID }}"
+          supabase functions deploy sr-generate-options --project-ref "${{ secrets.SUPABASE_PROJECT_ID }}"
+          supabase functions deploy sr-generate-sheet   --project-ref "${{ secrets.SUPABASE_PROJECT_ID }}"
+          supabase functions deploy sr-generate-asset   --project-ref "${{ secrets.SUPABASE_PROJECT_ID }}"
+          supabase functions deploy sr-breakdown        --project-ref "${{ secrets.SUPABASE_PROJECT_ID }}"
+          supabase functions deploy sr-render           --project-ref "${{ secrets.SUPABASE_PROJECT_ID }}"

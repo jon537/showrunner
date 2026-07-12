@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { invoke } from "../lib/supabase";
 import { useProjectContext } from "../lib/project";
+import { ZoomImg } from "../components/ZoomImg";
 
 // STEP 1 — define the locked look for the whole series before anything else.
 export function StylePage({ onApprove }: { onApprove: () => void }) {
@@ -71,7 +72,7 @@ export function StylePage({ onApprove }: { onApprove: () => void }) {
             <div className="bg-white/5 rounded p-3">
               <div className="text-xs opacity-40 mb-2">STYLE PLATE · {project?.aspect_ratio}</div>
               {project?.style_image_url
-                ? <img src={project.style_image_url} className="w-full rounded" />
+                ? <ZoomImg src={project.style_image_url} className="w-full rounded" />
                 : <span className="text-xs opacity-40">no plate</span>}
             </div>
             <div className="bg-white/5 rounded p-3">

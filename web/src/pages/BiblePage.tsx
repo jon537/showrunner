@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { supabase, invoke } from "../lib/supabase";
 import { useProjectContext } from "../lib/project";
+import { ZoomImg } from "../components/ZoomImg";
 
 type Kind = "character" | "prop" | "location";
 interface Asset {
   id: string; kind: Kind; name: string; description: string | null;
-  ref_slot: number | null; status: string; reference_image_urls: string[];
+  ref_slot: number | null; status: string;
+  options: string[]; chosen_image_url: string | null; reference_image_urls: string[];
 }
 
 export function BiblePage() {
@@ -33,14 +35,21 @@ export function BiblePage() {
     setName(""); setDesc(""); load();
   }
 
-  // regenerate=true re-runs the AI enhancer so the prompt is rewritten against the
-  // CURRENT style guide (not the cached one) — a full recast in the new style.
-  async function generate(id: string, regenerate: boolean) {
+  async function run(id: string, fn: () => Promise<unknown>) {
     setBusy(id);
-    try { await invoke("sr-generate-asset", { asset_id: id, regenerate }); await load(); }
-    catch (e) { alert("Generate failed: " + String(e)); }
+    try { await fn(); await load(); }
+    catch (e) { alert("Failed: " + String(e)); }
     finally { setBusy(null); }
   }
+
+  const genOptions = (id: string) => run(id, () => invoke("sr-generate-options", { asset_id: id }));
+  const genSheet = (id: string) => run(id, () => invoke("sr-generate-sheet", { asset_id: id }));
+  const choose = (id: string, url: string) => run(id, async () => {
+    await supabase.from("sr_assets").update({ chosen_image_url: url, status: "chosen" }).eq("id", id);
+  });
+  const recast = (id: string) => run(id, async () => {
+    await supabase.from("sr_assets").update({ chosen_image_url: null, status: "casting" }).eq("id", id);
+  });
 
   if (project && !project.style_locked) {
     return (
@@ -58,7 +67,7 @@ export function BiblePage() {
     <div className="space-y-6">
       <div>
         <h2 className="text-lg font-semibold">Bible — {project?.name ?? "…"}</h2>
-        <p className="text-sm opacity-60">Every sheet is generated in your locked style. Claude enhances the prompt → Nano Banana renders it with the style plate as reference.</p>
+        <p className="text-sm opacity-60">Cast → pick a look → lock the reference sheet. Click any image to enlarge.</p>
       </div>
 
       <div className="flex flex-wrap gap-2 items-end bg-white/5 p-3 rounded">
@@ -75,24 +84,83 @@ export function BiblePage() {
         <button onClick={add} className="bg-emerald-600 hover:bg-emerald-500 rounded px-3 py-1.5">Add</button>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-        {assets.map(a => (
-          <div key={a.id} className="bg-white/5 rounded p-3 space-y-2">
-            <div className="aspect-square bg-black/40 rounded overflow-hidden flex items-center justify-center">
-              {a.reference_image_urls?.[0]
-                ? <img src={a.reference_image_urls[0]} className="w-full h-full object-cover" />
-                : <span className="text-xs opacity-40">no sheet yet</span>}
+      <div className="space-y-4">
+        {assets.map(a => {
+          const opts = Array.isArray(a.options) ? a.options : [];
+          const working = busy === a.id;
+          return (
+            <div key={a.id} className="bg-white/5 rounded p-4 space-y-3">
+              <div className="flex items-center gap-2 text-sm">
+                <span className="opacity-40">[{a.kind} · slot {a.ref_slot}]</span>
+                <b>{a.name}</b>
+                <span className="opacity-40">{a.description}</span>
+                <span className="ml-auto text-xs px-2 py-0.5 rounded bg-black/40 opacity-70">{a.status}</span>
+              </div>
+
+              {/* READY — the locked reference sheet */}
+              {a.status === "ready" && a.reference_image_urls?.[0] && (
+                <div className="space-y-2">
+                  <div className="text-xs opacity-40">REFERENCE SHEET (locked)</div>
+                  <ZoomImg src={a.reference_image_urls[0]} className="max-h-72 rounded" />
+                  <div className="flex gap-2">
+                    <button disabled={working} onClick={() => genSheet(a.id)}
+                      className="text-sm bg-white/10 hover:bg-white/20 rounded px-3 py-1 disabled:opacity-40">
+                      {working ? "…" : "↻ Regenerate sheet"}
+                    </button>
+                    <button disabled={working} onClick={() => recast(a.id)}
+                      className="text-sm bg-white/10 hover:bg-white/20 rounded px-3 py-1 disabled:opacity-40">
+                      Re-cast
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* CHOSEN — a look is locked, build the sheet */}
+              {a.status !== "ready" && a.chosen_image_url && (
+                <div className="space-y-2">
+                  <div className="text-xs opacity-40">CHOSEN LOOK</div>
+                  <ZoomImg src={a.chosen_image_url} className="max-h-64 rounded" />
+                  <div className="flex gap-2">
+                    <button disabled={working} onClick={() => genSheet(a.id)}
+                      className="text-sm bg-emerald-600 hover:bg-emerald-500 rounded px-3 py-1 disabled:opacity-40">
+                      {working ? "building sheet…" : "Generate reference sheet →"}
+                    </button>
+                    <button disabled={working} onClick={() => recast(a.id)}
+                      className="text-sm bg-white/10 hover:bg-white/20 rounded px-3 py-1 disabled:opacity-40">
+                      Pick different
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* CASTING — options to choose from */}
+              {a.status !== "ready" && !a.chosen_image_url && (
+                <div className="space-y-2">
+                  {opts.length > 0 && (
+                    <>
+                      <div className="text-xs opacity-40">CASTING — pick a look</div>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                        {opts.map((url, i) => (
+                          <div key={i} className="space-y-1">
+                            <ZoomImg src={url} className="w-full aspect-square object-cover rounded" />
+                            <button disabled={working} onClick={() => choose(a.id, url)}
+                              className="w-full text-xs bg-emerald-600 hover:bg-emerald-500 rounded px-2 py-1 disabled:opacity-40">
+                              Choose
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                  <button disabled={working} onClick={() => genOptions(a.id)}
+                    className="text-sm bg-white/10 hover:bg-white/20 rounded px-3 py-1.5 disabled:opacity-40">
+                    {working ? "generating 4 options…" : opts.length ? "Generate 4 more" : "Generate 4 options"}
+                  </button>
+                </div>
+              )}
             </div>
-            <div className="text-sm">
-              <span className="opacity-40">[{a.kind} · slot {a.ref_slot}]</span><br />
-              <b>{a.name}</b>
-            </div>
-            <button disabled={busy === a.id} onClick={() => generate(a.id, a.status === "ready")}
-              className="w-full text-sm bg-white/10 hover:bg-white/20 rounded px-2 py-1 disabled:opacity-40">
-              {busy === a.id ? "generating…" : a.status === "ready" ? "regenerate" : "generate sheet"}
-            </button>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
