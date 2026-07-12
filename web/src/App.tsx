@@ -13,13 +13,18 @@ export function App() {
   const [ready, setReady] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [newPass, setNewPass] = useState("");
+  const [recovery, setRecovery] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (!supabaseConfigured) { setReady(true); return; }
     supabase.auth.getSession().then(({ data }) => { setSession(data.session); setReady(true); });
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
+    const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
+      setSession(s);
+      if (event === "PASSWORD_RECOVERY") setRecovery(true);
+    });
     return () => sub.subscription.unsubscribe();
   }, []);
 
@@ -40,6 +45,32 @@ export function App() {
 
   if (!ready) return <Shell><p className="opacity-60">Loading…</p></Shell>;
 
+  // Arrived via a password-reset link → set a new password.
+  if (recovery) {
+    async function setNewPassword() {
+      setBusy(true); setMsg(null);
+      const { error } = await supabase.auth.updateUser({ password: newPass });
+      if (error) setMsg(error.message);
+      else { setRecovery(false); setNewPass(""); setMsg(null); }
+      setBusy(false);
+    }
+    return (
+      <Shell>
+        <div className="max-w-sm mx-auto mt-24 space-y-3">
+          <h1 className="text-2xl font-semibold">Set a new password</h1>
+          <input className="w-full bg-white/5 rounded px-3 py-2 outline-none" type="password"
+            placeholder="new password" autoComplete="new-password" value={newPass}
+            onChange={e => setNewPass(e.target.value)} />
+          {msg && <p className="text-amber-400 text-sm">{msg}</p>}
+          <button disabled={busy || newPass.length < 6} onClick={setNewPassword}
+            className="w-full bg-emerald-600 hover:bg-emerald-500 rounded px-3 py-2 disabled:opacity-40">
+            Save new password
+          </button>
+        </div>
+      </Shell>
+    );
+  }
+
   if (!session) {
     async function signIn() {
       setBusy(true); setMsg(null);
@@ -52,6 +83,13 @@ export function App() {
       const { data, error } = await supabase.auth.signUp({ email, password });
       if (error) setMsg(error.message);
       else if (!data.session) setMsg("Account created. Check your email to confirm, then Sign in.");
+      setBusy(false);
+    }
+    async function forgotPassword() {
+      if (!email) { setMsg("Enter your email above first, then click Forgot password."); return; }
+      setBusy(true); setMsg(null);
+      const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin });
+      setMsg(error ? error.message : "Reset email sent — open the link, then set a new password.");
       setBusy(false);
     }
     return (
@@ -76,6 +114,10 @@ export function App() {
               Create account
             </button>
           </div>
+          <button disabled={busy} onClick={forgotPassword}
+            className="text-xs opacity-60 hover:opacity-100 underline">
+            Forgot password?
+          </button>
         </div>
       </Shell>
     );
