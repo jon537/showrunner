@@ -21,7 +21,7 @@ interface Ctx {
   loading: boolean;
   reload: () => Promise<void>;
   selectProject: (id: string) => void;
-  createProject: (name: string, pipeline?: string) => Promise<void>;
+  createProject: (name: string, pipeline?: string) => Promise<Project | null>;
   renameProject: (id: string, name: string) => Promise<void>;
 }
 
@@ -53,12 +53,14 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const createProject = useCallback(async (name: string, pipeline: string = "microdrama") => {
-    const { data } = await supabase.from("sr_projects")
+    const { data, error } = await supabase.from("sr_projects")
       .insert({ name, instance: "personal", kind: "animation", pipeline }).select(COLS).single();
+    if (error) throw new Error(`Could not create project: ${error.message}`);
     if (data) {
       setProjects(p => [...p, data as Project]);
       selectProject((data as Project).id);
     }
+    return (data as Project) ?? null;
   }, [selectProject]);
 
   const renameProject = useCallback(async (id: string, name: string) => {

@@ -158,12 +158,69 @@ function PipelinePicker({ value, onChange }: { value: string; onChange: (v: stri
   );
 }
 
-function Workspace() {
-  const { projects, project, loading, selectProject, createProject, renameProject } = useProjectContext();
-  const [tab, setTab] = useState<Tab>("story");
+// HOME — the front door, shown on every load: all projects as cards + create-new
+// with the inputs/outputs (pipeline) chooser.
+function Home({ onOpen }: { onOpen: (id: string) => void }) {
+  const { projects, createProject } = useProjectContext();
   const [newName, setNewName] = useState("");
   const [newPipeline, setNewPipeline] = useState("microdrama");
-  const [creating, setCreating] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  async function create() {
+    if (!newName.trim()) return;
+    setBusy(true);
+    try {
+      const p = await createProject(newName.trim(), newPipeline);
+      if (p) onOpen(p.id);
+    } catch (e) { alert(String(e)); }
+    finally { setBusy(false); }
+  }
+
+  return (
+    <Shell>
+      <div className="max-w-2xl mx-auto mt-12 space-y-8">
+        <div>
+          <h1 className="text-2xl font-semibold">Showrunner</h1>
+          <p className="text-sm opacity-60">Pick a project, or start a new one by choosing its inputs and outputs.</p>
+        </div>
+
+        {projects.length > 0 && (
+          <div className="grid md:grid-cols-2 gap-3">
+            {projects.map(p => (
+              <button key={p.id} onClick={() => onOpen(p.id)}
+                className="text-left rounded p-4 border border-white/10 bg-white/5 hover:bg-white/10 space-y-1">
+                <div className="font-medium">{p.name}</div>
+                <div className="text-xs opacity-60">
+                  {p.pipeline === "distribution" ? "📤 distribute-only" : "🎬 microdrama"}
+                  {p.pipeline !== "distribution" && (p.style_locked ? " · style locked" : " · style not set")}
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="bg-white/5 rounded p-4 space-y-3">
+          <div className="text-sm font-medium">＋ New project</div>
+          <PipelinePicker value={newPipeline} onChange={setNewPipeline} />
+          <div className="flex gap-2">
+            <input className="flex-1 bg-black/40 rounded px-3 py-2" placeholder="project name"
+              value={newName} onChange={e => setNewName(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter") create(); }} />
+            <button disabled={busy || !newName.trim()} onClick={create}
+              className="bg-emerald-600 hover:bg-emerald-500 rounded px-4 py-2 disabled:opacity-40">
+              Create
+            </button>
+          </div>
+        </div>
+      </div>
+    </Shell>
+  );
+}
+
+function Workspace() {
+  const { projects, project, loading, selectProject, renameProject } = useProjectContext();
+  const [view, setView] = useState<"home" | "project">("home");
+  const [tab, setTab] = useState<Tab>("story");
   const [renaming, setRenaming] = useState(false);
 
   const tabs = PIPELINE_TABS[project?.pipeline ?? "microdrama"] ?? PIPELINE_TABS.microdrama;
@@ -171,22 +228,16 @@ function Workspace() {
 
   if (loading) return <Shell><p className="opacity-60">Loading projects…</p></Shell>;
 
-  // No projects yet → choose inputs/outputs + name it.
-  if (!project) {
+  // The app ALWAYS starts on Home — the overview where you choose a project
+  // (or create one by picking its inputs/outputs).
+  if (view === "home" || !project) {
     return (
-      <Shell>
-        <div className="max-w-md mx-auto mt-24 space-y-4">
-          <h1 className="text-2xl font-semibold">Create your first project</h1>
-          <p className="text-sm opacity-60">Choose what this project is — its inputs and outputs — then name it.</p>
-          <PipelinePicker value={newPipeline} onChange={setNewPipeline} />
-          <input className="w-full bg-white/5 rounded px-3 py-2" placeholder="project name"
-            value={newName} onChange={e => setNewName(e.target.value)} />
-          <button disabled={!newName.trim()} onClick={() => createProject(newName.trim(), newPipeline)}
-            className="w-full bg-emerald-600 hover:bg-emerald-500 rounded px-3 py-2 disabled:opacity-40">
-            Create project
-          </button>
-        </div>
-      </Shell>
+      <Home onOpen={(id) => {
+        selectProject(id);
+        const p = projects.find(x => x.id === id);
+        setTab(p?.pipeline === "distribution" ? "library" : "story");
+        setView("project");
+      }} />
     );
   }
 
@@ -194,6 +245,8 @@ function Workspace() {
     <Shell>
       {/* Project bar */}
       <div className="flex items-center gap-2 mb-4 text-sm">
+        <button onClick={() => setView("home")} title="all projects"
+          className="px-2 py-1 rounded bg-white/5 hover:bg-white/10">⌂ Home</button>
         <span className="opacity-40">Project</span>
         {renaming ? (
           <input autoFocus defaultValue={project.name}
@@ -212,28 +265,6 @@ function Workspace() {
             <button onClick={() => setRenaming(true)} title="rename"
               className="opacity-50 hover:opacity-100">✎</button>
           </>
-        )}
-        {creating ? (
-          <>
-            <select value={newPipeline} onChange={e => setNewPipeline(e.target.value)}
-              className="bg-white/10 rounded px-2 py-1">
-              <option value="microdrama">🎬 microdrama</option>
-              <option value="distribution">📤 distribute-only</option>
-            </select>
-            <input autoFocus placeholder="new project name…"
-              className="bg-white/10 rounded px-2 py-1"
-              value={newName} onChange={e => setNewName(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === "Enter" && newName.trim()) {
-                  createProject(newName.trim(), newPipeline); setNewName(""); setCreating(false);
-                  setTab(newPipeline === "distribution" ? "library" : "story");
-                }
-                if (e.key === "Escape") { setCreating(false); setNewName(""); }
-              }} />
-          </>
-        ) : (
-          <button onClick={() => setCreating(true)}
-            className="px-2 py-1 rounded bg-white/5 hover:bg-white/10">＋ New</button>
         )}
         <span className="text-xs opacity-40">{project.pipeline === "distribution" ? "📤 distribute-only" : "🎬 microdrama"}</span>
         <button className="ml-auto px-3 py-1.5 rounded bg-white/5 hover:bg-white/10"
