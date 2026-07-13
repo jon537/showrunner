@@ -54,9 +54,10 @@ export function StoryPage({ goStyle }: { goStyle: () => void }) {
       const premise =
         `${c.title} — ${c.logline}\n\nSERIAL ENGINE: ${c.engine}\nTONE: ${c.tone}\n` +
         `CORE CAST: ${c.core_cast?.join("; ")}`;
-      await supabase.from("sr_projects").update({
+      const { error } = await supabase.from("sr_projects").update({
         name: c.title, premise, concept: c as unknown as Record<string, unknown>, market,
       }).eq("id", project.id);
+      if (error) throw new Error(`Could not save the concept: ${error.message}`);
       setChosen(c); setConcepts([]);
       await reload();
     } catch (e) { setErr(String(e)); }

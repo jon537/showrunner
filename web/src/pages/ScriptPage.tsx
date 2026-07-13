@@ -36,10 +36,10 @@ export function ScriptPage() {
   async function saveSeries() {
     if (!project || !s) return;
     setSavedMsg(null);
-    await supabase.from("sr_projects").update({
+    const { error } = await supabase.from("sr_projects").update({
       premise: s.premise, market: s.market, series_notes: s.series_notes, shots_per_episode: s.shots_per_episode,
     }).eq("id", project.id);
-    setSavedMsg("Saved.");
+    setSavedMsg(error ? `Save failed: ${error.message}` : "Saved.");
   }
 
   async function writeNext(times = 1) {
